@@ -1,0 +1,130 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum EnrolmentStatus {
+  ENROLLED
+  DEFERRED
+  WITHDRAWN
+  COMPLETED
+}
+
+enum Classification {
+  FAIL
+  PASS
+  MERIT
+  DISTINCTION
+}
+
+// ─── Models ──────────────────────────────────────────────────────────────────
+
+model Programme {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  code      String    @unique
+  feeAmount Decimal   @db.Decimal(10, 2)
+  students  Student[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Student {
+  id              String          @id @default(cuid())
+  studentId       String          @unique
+  fullName        String
+  email           String          @unique
+  dateOfBirth     DateTime
+  programmeId     String
+  programme       Programme       @relation(fields: [programmeId], references: [id])
+  academicYear    String
+  enrolmentStatus EnrolmentStatus @default(ENROLLED)
+  feeRecord       FeeRecord?
+  submissions     Submission[]
+  grades          Grade[]
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([enrolmentStatus])
+  @@index([programmeId])
+}
+
+model FeeRecord {
+  id          String    @id @default(cuid())
+  studentId   String    @unique
+  student     Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  totalAmount Decimal   @db.Decimal(10, 2)
+  dueDate     DateTime
+  payments    Payment[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Payment {
+  id              String    @id @default(cuid())
+  feeRecordId     String
+  feeRecord       FeeRecord @relation(fields: [feeRecordId], references: [id], onDelete: Cascade)
+  amount          Decimal   @db.Decimal(10, 2)
+  paymentDate     DateTime
+  referenceNumber String    @unique
+  notes           String?
+  createdAt       DateTime  @default(now())
+}
+
+model Assessment {
+  id          String       @id @default(cuid())
+  title       String
+  module      String
+  deadline    DateTime
+  submissions Submission[]
+  grades      Grade[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([deadline])
+}
+
+model Submission {
+  id           String     @id @default(cuid())
+  studentId    String
+  student      Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  assessmentId String
+  assessment   Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  fileName     String
+  fileUrl      String
+  fileSize     Int
+  submittedAt  DateTime   @default(now())
+  isLate       Boolean    @default(false)
+  updatedAt    DateTime   @updatedAt
+
+  @@unique([studentId, assessmentId])
+  @@index([assessmentId])
+}
+
+model Grade {
+  id             String         @id @default(cuid())
+  studentId      String
+  student        Student        @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  assessmentId   String
+  assessment     Assessment     @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  score          Int
+  classification Classification
+  isPublished    Boolean        @default(false)
+  publishedAt    DateTime?
+  feedback       String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@unique([studentId, assessmentId])
+  @@index([assessmentId])
+  @@index([isPublished])
+}
